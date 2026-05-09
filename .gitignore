@@ -1,3 +1,6 @@
 venv/ 
 data/ 
 .deepeval/
+.env/
+__pycache__/
+*.pyc
