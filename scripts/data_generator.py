@@ -19,7 +19,7 @@ class DataGenerator:
     OUTPUT_FOLDER = r"../data/Logs" 
     OUTPUT_FILE = os.path.join(OUTPUT_FOLDER, r"security_log.jsonl")
     INTERNAL_IPS = [f"192.168.1.{i}" for i in range(1, 50)]
-    NUM_logs = 1000
+    NUM_logs = 10000
     
     # Known "bad" external IPs we'll plant in attack scenarios
     MALICIOUS_IPS = [
@@ -49,7 +49,7 @@ class DataGenerator:
     # --- Generate events --- # 
     def failed_login_attempt(self):
         return{
-            "timstamp": self.random_timestamp(),
+            "timestamp": self.random_timestamp(),
             "event_type": "failed_login_attempt",
             "source_ip": random.choice(self.MALICIOUS_IPS + self.INTERNAL_IPS),
             "destination": random.choice(self.HOSTS),
@@ -60,7 +60,7 @@ class DataGenerator:
         
     def successful_login_attempt(self):
         return{
-            "timstamp": self.random_timestamp(),
+            "timestamp": self.random_timestamp(),
             "event_type": "successful_login_attempt",
             "source_ip": random.choice(self.INTERNAL_IPS),
             "destination": random.choice(self.HOSTS),
@@ -82,7 +82,7 @@ class DataGenerator:
             "timestamp": self.random_timestamp(),
             "event_type": "powershell_execution",
             "source_ip": random.choice(self.INTERNAL_IPS),
-            "destination_host": random.choice(self.HOSTS),
+            "destination": random.choice(self.HOSTS),
             "username": random.choice(self.USERNAMES),
             "command": random.choice(commands),
             "severity": random.choice(["low", "medium", "high"]),
@@ -95,7 +95,7 @@ class DataGenerator:
         "timestamp": self.random_timestamp(),
         "event_type": "malware_detected",
         "source_ip": random.choice(self.INTERNAL_IPS),
-        "destination_host": random.choice(self.HOSTS),
+        "destination": random.choice(self.HOSTS),
         "username": random.choice(self.USERNAMES),
         "malware_name": random.choice(malware_names),
         "file_path": f"C:\\Users\\{self.fake.user_name()}\\AppData\\{self.fake.file_name()}",
@@ -108,7 +108,7 @@ class DataGenerator:
             "timestamp": self.random_timestamp(),
             "event_type": "port_scan",
             "source_ip": random.choice(self.MALICIOUS_IPS),
-            "destination_host": random.choice(self.HOSTS),
+            "destination": random.choice(self.HOSTS),
             "ports_scanned": random.randint(100, 65535),
             "severity": "high",
             "message": "Port scanning activity detected",
@@ -119,7 +119,7 @@ class DataGenerator:
             "timestamp": self.random_timestamp(),
             "event_type": "privilege_escalation",
             "source_ip": random.choice(self.INTERNAL_IPS),
-            "destination_host": random.choice(self.HOSTS),
+            "destination": random.choice(self.HOSTS),
             "username": random.choice(self.USERNAMES),
             "escalated_to": "SYSTEM",
             "severity": "critical",
@@ -137,7 +137,7 @@ class DataGenerator:
             "timestamp": self.random_timestamp(),
             "event_type": "file_access",
             "source_ip": random.choice(self.INTERNAL_IPS),
-            "destination_host": random.choice(self.HOSTS),
+            "destination": random.choice(self.HOSTS),
             "username": random.choice(self.USERNAMES),
             "file_path": random.choice(sensitive_paths),
             "severity": random.choice(["low", "medium", "high"]),
@@ -149,7 +149,7 @@ class DataGenerator:
             "timestamp": self.random_timestamp(),
             "event_type": "suspicious_download",
             "source_ip": random.choice(self.INTERNAL_IPS),
-            "destination_host": random.choice(self.HOSTS),
+            "destination": random.choice(self.HOSTS),
             "username": random.choice(self.USERNAMES),
             "url": f"http://{self.fake.domain_name()}/{self.fake.file_name(extension='exe')}",
             "file_size_mb": round(random.uniform(0.1, 50.0), 2),
@@ -177,8 +177,6 @@ def main():
 
     def weighted_choice():
         methods, weights = zip(*EVENT_GENERATORS)
-        print(methods)
-        print(weights)
         return random.choices(methods, weights=weights, k=1)[0]
 
     if not os.path.exists(DG.OUTPUT_FOLDER):

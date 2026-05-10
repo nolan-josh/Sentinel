@@ -5,7 +5,8 @@ from dotenv import load_dotenv
 
 
 class Data_handler:
-    """ This is a class that will read in 1 or more JSONL files, and add them to a collection of a mongoDB database.
+    """ This is a class that will read in 1 or more JSONL files, and add them to a 
+    collection of a mongoDB database.
     """
     client = MongoClient("mongodb://localhost:27017")
     db = client["sentinel_ai"]
