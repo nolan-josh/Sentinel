@@ -11,8 +11,9 @@ COPY /scripts/live_data_generator.py /python_scripts
 COPY /scripts/data_generator.py /python_scripts
 COPY /scripts/ingest_logs.py /python_scripts
 COPY /scripts/alert_pipeline.py /python_scripts
+COPY /scripts/mongo_init.py /python_scripts
 
 RUN pip install pymongo faker
 
-# command to run when the container starts 
-CMD ["python", "-u", "/python_scripts/live_data_generator.py"]
+# command to run when the container starts  
+CMD ["python", "-u", "/python_scripts/live_data_generator.py"] 

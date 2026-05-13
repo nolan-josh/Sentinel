@@ -36,7 +36,7 @@ def main():
     connected = False
     while not connected:
         try:
-            client = MongoClient("mongodb://mongoDB:27017")
+            client = MongoClient("mongodb://mongoDB:27017/?replicaSet=rs0") # uses replica 0 for .watch() later on
             client.admin.command("ping")  # actually tests the connection
             print("Connected to MongoDB successfully")
             connected = True

@@ -19,7 +19,7 @@ class ThreatDetector:
     
     def __init__(self):
         ## connect to mongo DB | has to us mongoDB not localhost as this is the name for its service in  Docker
-        self.db = MongoClient("mongodb://mongoDB:27017")["sentinel_ai"]
+        self.db = client = MongoClient("mongodb://mongoDB:27017/?replicaSet=rs0")["sentinel_ai"] # uses replica 0 for .watch() later on
         self.logs_collection = self.db['logs']
         self.alerts_collection = self.db['alerts'] # (alerts collection is created first time we populate it)
         

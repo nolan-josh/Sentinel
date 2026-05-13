@@ -6,7 +6,7 @@ class Data_handler:
     """ This is a class that will read in 1 or more JSONL files, and add them to a 
     collection of a mongoDB database.
     """
-    CLIENT = MongoClient("mongodb://mongoDB:27017")
+    CLIENT = MongoClient("mongodb://mongoDB:27017/?replicaSet=rs0") # uses replica 0
     DB = CLIENT["sentinel_ai"]
     COLLECTION = DB['logs']
 
