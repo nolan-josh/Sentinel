@@ -29,3 +29,4 @@ class Data_handler:
         self.COLLECTION.create_index("source_ip")       
         
         print("index created")        
+#

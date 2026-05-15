@@ -14,7 +14,6 @@ services:
     volumes: 
       - mongodb_data:/data/db
     command: ["--replSet", "rs0"]  # initiliase a replica set
-
   mongo-init:
     build:
       context: .
@@ -22,7 +21,13 @@ services:
     depends_on:
       - mongoDB
     restart: "no"
-    
+  mongo-listener:
+    build:
+      context: .
+      dockerfile: listener_caller.dockerfile
+    depends_on:
+      - mongoDB
+
   redis:
     image: redis:7
     container_name: sentinel-redis

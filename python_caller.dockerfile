@@ -13,6 +13,7 @@ COPY /scripts/ingest_logs.py /python_scripts
 COPY /scripts/alert_pipeline.py /python_scripts
 COPY /scripts/mongo_init.py /python_scripts
 
+
 RUN pip install pymongo faker
 
 # command to run when the container starts  

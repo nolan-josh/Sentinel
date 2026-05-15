@@ -85,11 +85,12 @@ def main():
         time.sleep(30)
         method = data_generator.weighted_choice(EVENT_GENERATORS)
         data = json.loads(json.dumps(method())) ## return a JSON python object
+        
+        
         ## write to the collection for alerts
         result = alerts_collection.insert_one(data)
         if not result.acknowledged:
             print(f'{result.acknowledged} | error in writing to alerts collection') 
-            return
         print(result)    
         
         # with alerts_collection.watch() as changes:
