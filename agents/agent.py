@@ -1,5 +1,6 @@
 import time, os, requests
 from pymongo import MongoClient
+from pydantic import BaseModel
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 from langchain_core.tools import tool
@@ -14,6 +15,7 @@ from PIL import Image
 from typing import Annotated, Dict, TypedDict, List, Sequence
 from bson import ObjectId
 import dotenv
+import operator
 
 dotenv.load_dotenv()
 
@@ -21,7 +23,7 @@ mongo_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017/?replicaSet=rs0&di
 
 db = MongoClient(mongo_URL)["sentinel_ai"]        
 logs_collection = db['logs']
-alerts_collection = db['alerts'] # (alerts collection is created first time we populate it)
+alerts_collection = db['alerts'] 
 MALICIOUS_IPS = [
     "185.220.101.45",  
     "45.33.32.156",
@@ -29,9 +31,7 @@ MALICIOUS_IPS = [
     "89.248.167.131",
 ]
 
-# create state
-# decribes attributes about request
-# starts blank    
+ 
 class AgentState(TypedDict):
     """the add_message is an import above that appends the state instead of overwriting
 
@@ -53,6 +53,14 @@ class AgentState(TypedDict):
     alert_type: str
     affected_host: str                                    
     username: str
+    watchlist:  Annotated[list[str], operator.add]
+    blocked: Annotated[list[str], operator.add]
+    action_decision: str
+    # we need a reducer here for adding becasue if we just did state["watchlist"] = state["watchlist"] + new_list_data_to_add then
+    # when two nodes run in parallel and both try to update watchlist at the same time — LangGraph doesn't know how to 
+    # merge two different versions of the list, so one overwrites the other and you lose data.
+    # operator.add as a reducer tells LangGraph explicitly "when two nodes both update this field, combine them by concatenating" — 
+    # solving the parallel update problem.
       
 
 def print_stream(stream):
@@ -102,15 +110,13 @@ _
     
     
 def listen(graph: StateGraph):
-    connected = False
     app = graph.compile()
     print("graph compiled!")
-    #  compile graph
-
-    while not connected:
+    while True:
         try:     
             print("Listening...")
             with alerts_collection.watch() as changes:
+                        time.sleep(10)
                         for change in changes:
                             alert = change['fullDocument']
                             print(f'change found: {change['fullDocument']}')
@@ -119,9 +125,11 @@ def listen(graph: StateGraph):
                                 inputs = {
                                     "messages": [(
                                         "user", 
-                                        "We have detected a new entry in our alerts collection within our" + 
-                                        f"database. Using the data below please determine if the severity needs to be escelated based on thise source_ip's existing history in the database. data is here: {str(change['fullDocument'])}. " +
-                                        f" Once you have made your decision based on then data you pulled from the db for that IP, please update the entry in my collection to the more appropriate severity.")],
+                                        f"""We have detected a new entry in our alerts collection within our database. 
+                                        Using the data below please determine if the severity needs to be escelated based on thise source_ip's existing history in the database. 
+                                        Data is here: {str(change['fullDocument'])} Once you have made your decision based on then data you pulled from the db for that IP, 
+                                        please update the entry in my collection to the more appropriate severity.""")],
+                                    
                                     "suspect_IP": alert.get("source_ip", ""),
                                     "alert_ID": alert.get("_id", ""),
                                     "alert_type": alert.get("type", ""),
@@ -158,7 +166,6 @@ def model_call(state: AgentState) -> AgentState:
             if tool_call["name"] == "get_IP_info":
                 suspect_ip = tool_call["args"]["IP"]
                 
-    print(f"suspect_IP going out: {suspect_ip}") 
     return {
         "messages": [response],
         "suspect_IP": suspect_ip  # write IP to state
@@ -217,8 +224,8 @@ def call_virustotal(IP_to_check: str):
     }
     
     response = json.loads(requests.get(url, headers=headers).text)
-    print(json.dumps(response["data"], sort_keys=True, indent=4))
-    
+    response.update({"ip_address": IP_to_check}) ## appends the IP to end of response so we know which IP this data maps to
+    print(json.dumps(response, sort_keys=True, indent=4))
 
 def threat_intel_node(state: AgentState) -> AgentState:
     ip = state["suspect_IP"]
@@ -237,9 +244,37 @@ def threat_intel_node(state: AgentState) -> AgentState:
         }
     }   
 
+class AnswerWithJustification(BaseModel):
+    '''An answer to the user question along with justification for the answer.'''
+
+    answer: str
+    justification: str
+
+def log_analyse_node(state: AgentState) -> AgentState:
+    
+    ## check the state and decide if we need to block it
+    # update action_decision based on this
+    system_prompt = SystemMessage(content="you are an ai assistant in my cyber security team working with a SOC system, using the state answer my question to the best of your ability")
+    new_human_prompt = HumanMessage(content=f"""
+        Based on the following information, determine if the suspect IP should be 
+        added to watchlist, blocklist, or do nothing.
+        
+        Suspect IP: {state["suspect_IP"]}
+        Alert type: {state["alert_type"]}
+        IP reputation data: {state["IP_info"]}
+    """)
+    structured_model = model.with_structured_output(AnswerWithJustification)
+    response = structured_model.invoke([system_prompt] + state["messages"] + [new_human_prompt])
+    print(f"\n\n answer: {response}")
+    return(state)
+
+    
+
+
 
 tools = [get_IP_info, escalate_alert_entry]
 model = ChatOpenAI(model="gpt-4o").bind_tools(tools)
+
 def create_graph() -> StateGraph:
     
     
@@ -253,6 +288,7 @@ def create_graph() -> StateGraph:
     print(type(tool_node))
     graph.add_node("tools", tool_node)
     graph.add_node("threat_intel_node", threat_intel_node)
+    graph.add_node("analysis_node", log_analyse_node)
 
 
     # the model knows to call the right tool in toolnode because it looks at last message 
@@ -271,7 +307,9 @@ def create_graph() -> StateGraph:
         }
     )
     graph.add_edge("tools", "agent")
-    graph.add_edge("threat_intel_node", END)
+    graph.add_edge("threat_intel_node", "analysis_node")
+    graph.add_edge("analysis_node", END)
+    
 
     ## after calling tool go back to agent so its ongoing 
     return graph
